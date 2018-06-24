@@ -13,6 +13,10 @@ RUNS_DIR = './runs'
 VGG_PATH = os.path.join(DATA_DIR, 'vgg')
 NUM_CLASSES = 2
 IMAGE_SHAPE = (160, 576)
+LEARNING_RATE = 0.001
+NUM_EPOCHS = 1
+BATCH_SIZE = 10
+KEEP_PROB = 0.7
 
 ## Check TensorFlow Version
 #assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -101,9 +105,11 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    # TODO: Implement function
-    return None, None, None
-#tests.test_optimize(optimize)
+    logits = tf.reshape(nn_last_layer, (-1, num_classes)) # Reshape 4D to 2D.
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
+    train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    return logits, train_op, loss
+tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -121,9 +127,20 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
-    pass
-#tests.test_train_nn(train_nn)
+    print('Starting training...')
+    sess.run([tf.global_variables_initializer(), tf.local_variables_initializer()])
+    for epoch in range(epochs):
+        batch = 0
+        for py_input_image, py_correct_label in get_batches_fn(batch_size):
+            _, loss_val = sess.run(
+                [train_op, cross_entropy_loss],
+                feed_dict={input_image: py_input_image,
+                           correct_label: py_correct_label,
+                           keep_prob: KEEP_PROB,
+                           learning_rate: LEARNING_RATE})
+            print('Epoch {} batch {} loss {}'.format(epoch, batch, loss_val))
+            batch += 1
+tests.test_train_nn(train_nn)
 
 
 def run():
@@ -147,40 +164,42 @@ def run():
                         num_classes=NUM_CLASSES)
 
         #########################################################################################################
-        # This section is for development only; can be removed without affecting the model.
-        # Print the shapes of the tensors (need to evaluate them, since not all dimensions are known statically).
-        print('Tensor shapes:')
-        sess.run(tf.local_variables_initializer())
-        sess.run(tf.global_variables_initializer())
-        tensors_to_print = [vgg_input_tensor,
-                            vgg_layer3_out_tensor,
-                            vgg_layer4_out_tensor,
-                            vgg_layer7_out_tensor,
-                            output]
-        shapes = sess.run([tf.shape(t) for t in tensors_to_print],
-                          # Feed dummy data.
-                          {vgg_input_tensor: np.zeros([1, IMAGE_SHAPE[0], IMAGE_SHAPE[1], 3]),
-                           vgg_keep_prob_tensor: 1.0})
-        name_to_shape = {t.name : shape for t, shape in zip(tensors_to_print, shapes)}
-        print(name_to_shape)
-        # Make sure the shape of the output matches the one of the input.
-        in_shape = name_to_shape[vgg_input_tensor.name]
-        out_shape = name_to_shape[output.name]
-        np.testing.assert_array_equal(np.array(in_shape[:3]), np.array(out_shape[:3]))
+        # THIS SECTION IS FOR DEBUGGING ONLY.
+        #
+        # # Print the shapes of the tensors (need to evaluate them, since not all dimensions are known statically).
+        # print('Tensor shapes:')
+        # sess.run(tf.local_variables_initializer())
+        # sess.run(tf.global_variables_initializer())
+        # tensors_to_print = [vgg_input_tensor,
+        #                     vgg_layer3_out_tensor,
+        #                     vgg_layer4_out_tensor,
+        #                     vgg_layer7_out_tensor,
+        #                     output]
+        # shapes = sess.run([tf.shape(t) for t in tensors_to_print],
+        #                   # Feed dummy data.
+        #                   {vgg_input_tensor: np.zeros([1, IMAGE_SHAPE[0], IMAGE_SHAPE[1], 3]),
+        #                    vgg_keep_prob_tensor: 1.0})
+        # name_to_shape = {t.name : shape for t, shape in zip(tensors_to_print, shapes)}
+        # print(name_to_shape)
+        # # Make sure the shape of the output matches the one of the input.
+        # in_shape = name_to_shape[vgg_input_tensor.name]
+        # out_shape = name_to_shape[output.name]
+        # np.testing.assert_array_equal(np.array(in_shape[:3]), np.array(out_shape[:3]))
         #########################################################################################################
 
-#        # Create function to get batches
-#        get_batches_fn = helper.gen_batch_function(os.path.join(DATA_DIR, 'data_road/training'), image_shape)
-#
-#        # OPTIONAL: Augment Images for better results
-#        #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
-#
-#        # TODO: Build NN using load_vgg, layers, and optimize function
-#
-#        # TODO: Train NN using the train_nn function
-#
-#        # TODO: Save inference data using helper.save_inference_samples
-#        #  helper.save_inference_samples(RUNS_DIR, DATA_DIR, sess, image_shape, logits, keep_prob, input_image)
+
+        correct_label = tf.placeholder(
+            dtype=tf.int32,
+            shape=[None, IMAGE_SHAPE[0], IMAGE_SHAPE[1], NUM_CLASSES])
+        learning_rate = tf.placeholder(dtype=tf.float32, shape=[])
+      
+        logits, train_op, loss = optimize(output, correct_label, learning_rate, NUM_CLASSES)
+        get_batches_fn = helper.gen_batch_function(os.path.join(DATA_DIR, 'data_road/training'), IMAGE_SHAPE)
+
+        train_nn(sess, NUM_EPOCHS, BATCH_SIZE, get_batches_fn, train_op, loss, vgg_input_tensor,
+                 correct_label, vgg_keep_prob_tensor, learning_rate)
+
+        helper.save_inference_samples(RUNS_DIR, DATA_DIR, sess, IMAGE_SHAPE, logits, vgg_keep_prob_tensor, vgg_input_tensor)
 #
 #        # OPTIONAL: Apply the trained model to a video
 
