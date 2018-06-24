@@ -13,20 +13,21 @@ RUNS_DIR = './runs'
 VGG_PATH = os.path.join(DATA_DIR, 'vgg')
 NUM_CLASSES = 2
 IMAGE_SHAPE = (160, 576)
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 1
-BATCH_SIZE = 10
-KEEP_PROB = 0.7
+# These values were determined experimentally. Loss is ~0.03.
+LEARNING_RATE = 0.0009
+NUM_EPOCHS = 50
+BATCH_SIZE = 5
+KEEP_PROB = 0.5
 
-## Check TensorFlow Version
-#assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
-#print('TensorFlow Version: {}'.format(tf.__version__))
-#
-## Check for a GPU
-#if not tf.test.gpu_device_name():
-#    warnings.warn('No GPU found. Please use a GPU to train your neural network.')
-#else:
-#    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+# Check TensorFlow Version
+assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
+print('TensorFlow Version: {}'.format(tf.__version__))
+
+# Check for a GPU
+if not tf.test.gpu_device_name():
+    warnings.warn('No GPU found. Please use a GPU to train your neural network.')
+else:
+    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
 
 def load_vgg(sess, vgg_path):
@@ -108,6 +109,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     logits = tf.reshape(nn_last_layer, (-1, num_classes)) # Reshape 4D to 2D.
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
     train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+
     return logits, train_op, loss
 tests.test_optimize(optimize)
 
@@ -132,7 +134,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     for epoch in range(epochs):
         batch = 0
         for py_input_image, py_correct_label in get_batches_fn(batch_size):
-            _, loss_val = sess.run(
+            _, loss_val, = sess.run(
                 [train_op, cross_entropy_loss],
                 feed_dict={input_image: py_input_image,
                            correct_label: py_correct_label,
@@ -187,7 +189,6 @@ def run():
         # np.testing.assert_array_equal(np.array(in_shape[:3]), np.array(out_shape[:3]))
         #########################################################################################################
 
-
         correct_label = tf.placeholder(
             dtype=tf.int32,
             shape=[None, IMAGE_SHAPE[0], IMAGE_SHAPE[1], NUM_CLASSES])
@@ -200,8 +201,6 @@ def run():
                  correct_label, vgg_keep_prob_tensor, learning_rate)
 
         helper.save_inference_samples(RUNS_DIR, DATA_DIR, sess, IMAGE_SHAPE, logits, vgg_keep_prob_tensor, vgg_input_tensor)
-#
-#        # OPTIONAL: Apply the trained model to a video
 
 
 if __name__ == '__main__':
