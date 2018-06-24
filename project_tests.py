@@ -33,9 +33,9 @@ def _assert_tensor_shape(tensor, shape, display_name):
     tensor_shape = tensor.get_shape().as_list() if len(shape) else []
 
     wrong_dimension = [ten_dim for ten_dim, cor_dim in zip(tensor_shape, shape)
-                       if cor_dim is not None and ten_dim != cor_dim]
+                       if cor_dim is not None and ten_dim is not None and ten_dim != cor_dim]
     assert not wrong_dimension, \
-        '{} has wrong shape.  Found {}'.format(display_name, tensor_shape)
+        '{} has wrong shape. Found {}. Actual {}.'.format(display_name, tensor_shape, shape)
 
 
 class TmpMock(object):
@@ -87,8 +87,8 @@ def test_layers(layers):
     vgg_layer4_out = tf.placeholder(tf.float32, [None, None, None, 512])
     vgg_layer7_out = tf.placeholder(tf.float32, [None, None, None, 4096])
     layers_output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
-
-    _assert_tensor_shape(layers_output, [None, None, None, num_classes], 'Layers Output')
+    original_shape = (375, 1242, 3)
+    _assert_tensor_shape(layers_output, [None, original_shape[0], original_shape[1], num_classes], 'Layers Output')
 
 
 @test_safe
